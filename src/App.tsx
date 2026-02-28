@@ -1,51 +1,271 @@
-import { useState } from "react";
-import reactLogo from "./assets/react.svg";
-import { invoke } from "@tauri-apps/api/core";
-import "./App.css";
+import { useState, useEffect } from 'react'
+import { invoke } from '@tauri-apps/api/core'
+import './App.css'
+
+interface Project {
+  id: string
+  name: string
+  description: string | null
+  created_at: number
+  updated_at: number
+}
+
+interface AppInfo {
+  name: string
+  version: string
+  description: string
+}
 
 function App() {
-  const [greetMsg, setGreetMsg] = useState("");
-  const [name, setName] = useState("");
+  const [appInfo, setAppInfo] = useState<AppInfo | null>(null)
+  const [projects, setProjects] = useState<Project[]>([])
+  const [newProjectName, setNewProjectName] = useState('')
+  const [newProjectDesc, setNewProjectDesc] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [activeTab, setActiveTab] = useState('dashboard')
 
-  async function greet() {
-    // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-    setGreetMsg(await invoke("greet", { name }));
+  useEffect(() => {
+    // Initialize database and load data
+    initializeApp()
+  }, [])
+
+  const initializeApp = async () => {
+    setLoading(true)
+    try {
+      // Get app info
+      const info = await invoke<AppInfo>('get_app_info')
+      setAppInfo(info)
+
+      // Initialize database
+      await invoke('init_database')
+
+      // Load projects
+      await loadProjects()
+    } catch (error) {
+      console.error('Failed to initialize app:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const loadProjects = async () => {
+    try {
+      const projectList = await invoke<Project[]>('get_projects')
+      setProjects(projectList)
+    } catch (error) {
+      console.error('Failed to load projects:', error)
+    }
+  }
+
+  const createProject = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!newProjectName.trim()) return
+
+    try {
+      await invoke('create_project', {
+        name: newProjectName,
+        description: newProjectDesc || null
+      })
+      setNewProjectName('')
+      setNewProjectDesc('')
+      await loadProjects()
+    } catch (error) {
+      console.error('Failed to create project:', error)
+    }
   }
 
   return (
-    <main className="container">
-      <h1>Welcome to Tauri + React</h1>
+    <div className="app">
+      <nav className="sidebar">
+        <div className="logo">
+          🧠 CortexMind
+        </div>
+        <div className="nav-items">
+          <button
+            className={`nav-item ${activeTab === 'dashboard' ? 'active' : ''}`}
+            onClick={() => setActiveTab('dashboard')}
+          >
+            📊 Dashboard
+          </button>
+          <button
+            className={`nav-item ${activeTab === 'projects' ? 'active' : ''}`}
+            onClick={() => setActiveTab('projects')}
+          >
+            📁 Projects
+          </button>
+          <button
+            className={`nav-item ${activeTab === 'knowledge' ? 'active' : ''}`}
+            onClick={() => setActiveTab('knowledge')}
+          >
+            🧠 Knowledge
+          </button>
+          <button
+            className={`nav-item ${activeTab === 'search' ? 'active' : ''}`}
+            onClick={() => setActiveTab('search')}
+          >
+            🔍 Search
+          </button>
+          <button
+            className={`nav-item ${activeTab === 'agents' ? 'active' : ''}`}
+            onClick={() => setActiveTab('agents')}
+          >
+            🔌 Agents
+          </button>
+          <button
+            className={`nav-item ${activeTab === 'settings' ? 'active' : ''}`}
+            onClick={() => setActiveTab('settings')}
+          >
+            ⚙️ Settings
+          </button>
+        </div>
+        {appInfo && (
+          <div className="app-version">
+            v{appInfo.version}
+          </div>
+        )}
+      </nav>
 
-      <div className="row">
-        <a href="https://vite.dev" target="_blank">
-          <img src="/vite.svg" className="logo vite" alt="Vite logo" />
-        </a>
-        <a href="https://tauri.app" target="_blank">
-          <img src="/tauri.svg" className="logo tauri" alt="Tauri logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <p>Click on the Tauri, Vite, and React logos to learn more.</p>
+      <main className="main-content">
+        {loading ? (
+          <div className="loading">
+            <div className="spinner"></div>
+            <p>Loading CortexMind...</p>
+          </div>
+        ) : (
+          <>
+            {activeTab === 'dashboard' && (
+              <div className="page">
+                <header>
+                  <h1>📊 Dashboard</h1>
+                  <p>Welcome to CortexMind - Your AI Experience, Perfected</p>
+                </header>
+                <div className="stats">
+                  <div className="stat-card">
+                    <div className="stat-value">{projects.length}</div>
+                    <div className="stat-label">Projects</div>
+                  </div>
+                  <div className="stat-card">
+                    <div className="stat-value">0</div>
+                    <div className="stat-label">Knowledge Items</div>
+                  </div>
+                  <div className="stat-card">
+                    <div className="stat-value">0</div>
+                    <div className="stat-label">Active Agents</div>
+                  </div>
+                  <div className="stat-card">
+                    <div className="stat-value">0</div>
+                    <div className="stat-label">Sessions</div>
+                  </div>
+                </div>
+              </div>
+            )}
 
-      <form
-        className="row"
-        onSubmit={(e) => {
-          e.preventDefault();
-          greet();
-        }}
-      >
-        <input
-          id="greet-input"
-          onChange={(e) => setName(e.currentTarget.value)}
-          placeholder="Enter a name..."
-        />
-        <button type="submit">Greet</button>
-      </form>
-      <p>{greetMsg}</p>
-    </main>
-  );
+            {activeTab === 'projects' && (
+              <div className="page">
+                <header>
+                  <h1>📁 Projects</h1>
+                  <p>Manage your development projects</p>
+                </header>
+
+                <div className="create-project-form">
+                  <h2>Create New Project</h2>
+                  <form onSubmit={createProject}>
+                    <input
+                      type="text"
+                      placeholder="Project name"
+                      value={newProjectName}
+                      onChange={(e) => setNewProjectName(e.target.value)}
+                      required
+                    />
+                    <input
+                      type="text"
+                      placeholder="Description (optional)"
+                      value={newProjectDesc}
+                      onChange={(e) => setNewProjectDesc(e.target.value)}
+                    />
+                    <button type="submit">Create Project</button>
+                  </form>
+                </div>
+
+                <div className="projects-list">
+                  <h2>Your Projects</h2>
+                  {projects.length === 0 ? (
+                    <p className="empty-state">No projects yet. Create your first project above!</p>
+                  ) : (
+                    <div className="project-grid">
+                      {projects.map(project => (
+                        <div key={project.id} className="project-card">
+                          <h3>{project.name}</h3>
+                          {project.description && (
+                            <p>{project.description}</p>
+                          )}
+                          <div className="project-meta">
+                            <span>Created: {new Date(project.created_at * 1000).toLocaleDateString()}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'knowledge' && (
+              <div className="page">
+                <header>
+                  <h1>🧠 Knowledge Base</h1>
+                  <p>Your accumulated AI experience</p>
+                </header>
+                <div className="empty-state">
+                  <p>Knowledge features coming soon!</p>
+                  <p>This will allow you to browse, search, and manage all knowledge extracted from your AI sessions.</p>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'search' && (
+              <div className="page">
+                <header>
+                  <h1>🔍 Search</h1>
+                  <p>Find knowledge across all your AI interactions</p>
+                </header>
+                <div className="empty-state">
+                  <p>Search features coming soon!</p>
+                  <p>This will enable semantic search powered by vector embeddings.</p>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'agents' && (
+              <div className="page">
+                <header>
+                  <h1>🔌 Agent Connections</h1>
+                  <p>Connect your AI tools to CortexMind</p>
+                </header>
+                <div className="empty-state">
+                  <p>Agent connections coming soon!</p>
+                  <p>Supported: OpenCode, ClaudeCode, OpenClaw, Cursor, and more.</p>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'settings' && (
+              <div className="page">
+                <header>
+                  <h1>⚙️ Settings</h1>
+                  <p>Configure CortexMind</p>
+                </header>
+                <div className="empty-state">
+                  <p>Settings coming soon!</p>
+                  <p>Configure AI models, vector database, and sync options.</p>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </main>
+    </div>
+  )
 }
 
-export default App;
+export default App
