@@ -178,10 +178,11 @@ impl Database {
     pub fn create_task(&self, project_id: Option<&str>, title: &str, status: &str) -> SqlResult<Task> {
         let id = Uuid::new_v4().to_string();
         let now = Utc::now().timestamp();
+        let pid = project_id.unwrap_or("").to_string();
 
         self.conn.execute(
             "INSERT INTO tasks (id, project_id, title, status, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-            [&id, &project_id.unwrap_or(""), title, status, &now.to_string(), &now.to_string()],
+            [&id, &pid, title, status, &now.to_string(), &now.to_string()],
         )?;
 
         Ok(Task {
@@ -237,10 +238,14 @@ impl Database {
     pub fn create_knowledge_item(&self, session_id: Option<&str>, task_id: Option<&str>, item_type: &str, title: Option<&str>, summary: Option<&str>, tags: &str) -> SqlResult<KnowledgeItem> {
         let id = Uuid::new_v4().to_string();
         let now = Utc::now().timestamp();
+        let sid = session_id.unwrap_or("").to_string();
+        let tid = task_id.unwrap_or("").to_string();
+        let t = title.unwrap_or("").to_string();
+        let s = summary.unwrap_or("").to_string();
 
         self.conn.execute(
             "INSERT INTO knowledge_items (id, session_id, task_id, item_type, title, summary, tags, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
-            [&id, &session_id.unwrap_or(""), &task_id.unwrap_or(""), item_type, &title.unwrap_or(""), &summary.unwrap_or(""), tags, &now.to_string()],
+            [&id, &sid, &tid, item_type, &t, &s, tags, &now.to_string()],
         )?;
 
         Ok(KnowledgeItem {

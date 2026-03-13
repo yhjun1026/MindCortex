@@ -11,17 +11,18 @@ mod config;
 mod app_state;
 
 use agents::{AgentConfig, SessionData};
-use database::{Database, Project, Task, KnowledgeItem};
-use extractor::{KnowledgeItem as ExtractedItem};
+use database::{Database, Project, Task};
+use database::KnowledgeItem as DbKnowledgeItem;
+use extractor::KnowledgeItem;
 use app_state::AppState;
-use tauri::State;
-use std::sync::Arc;
+use tauri::{State, Manager};
+use std::sync::{Arc, Mutex};
 
 // Tauri Commands
 
 #[tauri::command]
-async fn greet(name: &str) -> String {
-    format!("Hello, {}! Welcome to CortexMind!", name)
+async fn greet(name: &str) -> Result<String, String> {
+    Ok(format!("Hello, {}! Welcome to CortexMind!", name))
 }
 
 #[tauri::command]
@@ -117,9 +118,12 @@ async fn search_knowledge(
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .setup AppState {
-            db: Mutex::new(None),
-            config_path: "config.json".to_string(),
+        .setup(|app| {
+            app.manage(AppState {
+                db: Arc::new(Mutex::new(None)),
+                config_path: "config.json".to_string(),
+            });
+            Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             greet,
