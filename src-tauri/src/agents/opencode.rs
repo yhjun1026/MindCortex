@@ -1,7 +1,7 @@
 // OpenCode Agent Connector
 // 解析 OpenCode 的日志文件和会话数据
 
-use super::{AgentConnector, AgentConfig, SessionData, Message};
+use super::{AgentConnector, AgentConfig, SessionData, Message, Attachment};
 use std::path::{Path, PathBuf};
 use chrono::{DateTime, Utc, TimeZone};
 use serde_json::Value;
@@ -30,8 +30,7 @@ pub struct OpenCodeConnector {
 
 impl OpenCodeConnector {
     pub fn new() -> Self {
-        // 默认 OpenCode 日志路径
-        let home = std::env::var("HOME").unwrap_or_else(|| ".".to_string());
+        let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
         let log_path = PathBuf::from(home)
             .join(".opencode")
             .join("logs")
@@ -48,12 +47,10 @@ impl OpenCodeConnector {
         self
     }
 
-    /// 检查 OpenCode 日志是否存在
     pub fn check_logs(&self) -> bool {
         self.log_path.exists()
     }
 
-    /// 解析 OpenCode 日志文件
     pub fn parse_logs(&self) -> Result<Vec<SessionData>, String> {
         if !self.log_path.exists() {
             return Ok(vec![]);
@@ -66,36 +63,30 @@ impl OpenCodeConnector {
         Ok(sessions)
     }
 
-    /// 解析日志内容
     fn parse_log_content(&self, content: &str) -> Result<Vec<SessionData>, String> {
         let mut sessions: Vec<SessionData> = vec![];
         let mut current_messages: Vec<Message> = vec![];
         let mut current_session_id: Option<String> = None;
         let mut session_start: i64 = Utc::now().timestamp();
 
-        // OpenCode 日志格式解析
         for line in content.lines() {
             let trimmed = line.trim();
 
-            // 会话开始标记
             if trimmed.starts_with("=== Session:") || trimmed.contains("New conversation") {
-                // 保存上一个会话
                 if !current_messages.is_empty() {
-                    if let Some(sid) = current_session_id {
+                    if let Some(sid) = &current_session_id {
                         sessions.push(self.create_session_data(
-                            &sid,
-                            current_messages.clone(),
+                            sid,
+                            &current_messages,
                             session_start,
                         ));
                     }
                 }
 
-                // 开始新会话
-                current_session_id = Some(self.extract_session_id(line));
+                current_session_id = Some(self.extract_session_id_id(line));
                 current_messages.clear();
                 session_start = Utc::now().timestamp();
             }
-            // 消息行
             else if trimmed.starts_with("[User]:") || trimmed.starts_with("[Assistant]:") {
                 if let Some(msg) = self.parse_message(line) {
                     current_messages.push(msg);
@@ -103,12 +94,11 @@ impl OpenCodeConnector {
             }
         }
 
-        // 保存最后一个会话
         if !current_messages.is_empty() {
-            if let Some(sid) = current_session_id {
+            if let Some(sid) = &current_session_id {
                 sessions.push(self.create_session_data(
-                    &sid,
-                    current_messages,
+                    sid,
+                    &current_messages,
                     session_start,
                 ));
             }
@@ -117,11 +107,9 @@ impl OpenCodeConnector {
         Ok(sessions)
     }
 
-    /// 提取会话 ID
-    fn extract_session_id(&self, line: &str) -> String {
-        // 尝试从日志行提取 ID
+    fn extract_session_id_id(&self, line: &str) -> String {
         if let Some(pos) = line.find("Session:") {
-)            let id_part = line[pos + "Session:".len()..].trim();
+            let id_part = line[pos + "Session:".len()..].trim();
             if !id_part.is_empty() {
                 return id_part.to_string();
             }
@@ -129,7 +117,6 @@ impl OpenCodeConnector {
         uuid::Uuid::new_v4().to_string()
     }
 
-    /// 解析消息行
     fn parse_message(&self, line: &str) -> Option<Message> {
         let trimmed = line.trim();
 
@@ -152,13 +139,12 @@ impl OpenCodeConnector {
         }
     }
 
-    /// 创建会话数据
-    fn create_session_data(&self, id: &str, messages: Vec<Message>, timestamp: i64) -> SessionData {
+    fn create_session_data(&self, id: &str, messages: &Vec<Message>, timestamp: i64) -> SessionData {
         SessionData {
             id: id.to_string(),
             agent_type: "opencode".to_string(),
             timestamp,
-            messages,
+            messages: messages.clone(),
             metadata: serde_json::json!({
                 "source": "logfile",
                 "message_count": messages.len()
@@ -166,18 +152,14 @@ impl OpenCodeConnector {
         }
     }
 
-    /// 获取最近的会话
     pub fn get_recent_sessions(&self, limit: usize) -> Result<Vec<SessionData>, String> {
         let mut sessions = self.parse_logs()?;
-        sessions.reverse(); // 最新的在前
+        sessions.reverse();
         sessions.truncate(limit);
         Ok(sessions)
     }
 
-    /// 监听日志文件变化
     pub fn watch_logs(&self) -> Result<(), String> {
-        // TODO: 实现文件监听器
-        // 使用 notify crate 监听日志文件变化
         println!("Watching OpenCode logs at: {:?}", self.log_path);
         Ok(())
     }
@@ -200,10 +182,10 @@ impl AgentConnector for OpenCodeConnector {
     }
 
     async fn fetch_sessions(&self) -> Result<Vec<SessionData>, String> {
-        self.get_recent_sessions(100) // 获取最近 100 个会话
+        self.get_recent_sessions(100)
     }
 
-    fn watch_session(&self, _callback: crate::agents::SessionCallback) -> Result<(), String> {
+    fn watch_session(&self, _callback: Option<super::SessionCallback>) -> Result<(), String> {
         self.watch_logs()
     }
 }
