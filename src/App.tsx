@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import './App.css'
+import { SearchPage } from './pages/SearchPage'
 
 interface Project {
   id: string
@@ -223,18 +224,7 @@ function App() {
               </div>
             )}
 
-            {activeTab === 'search' && (
-              <div className="page">
-                <header>
-                  <h1>🔍 Search</h1>
-                  <p>Find knowledge across all your AI interactions</p>
-                </header>
-                <div className="empty-state">
-                  <p>Search features coming soon!</p>
-                  <p>This will enable semantic search powered by vector embeddings.</p>
-                </div>
-              </div>
-            )}
+            {activeTab === 'search' && <SearchPage />}
 
             {activeTab === 'agents' && (
               <div className="page">

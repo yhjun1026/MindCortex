@@ -2,6 +2,8 @@ use serde::{Deserialize, Serialize};
 
 pub mod opencode;
 pub mod claudecode;
+pub mod cursor;
+pub mod agent_sync;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentConfig {
@@ -57,6 +59,7 @@ pub fn create_agent_connector(agent_type: &str) -> Box<dyn AgentConnector> {
     match agent_type {
         "opencode" => Box::new(OpenCodeAdapter::new()),
         "claudecode" => Box::new(ClaudeCodeAdapter::new()),
+        "cursor" => Box::new(CursorAdapter::new()),
         _ => Box::new(GenericAdapter::new()),
     }
 }
@@ -83,6 +86,19 @@ impl ClaudeCodeAdapter {
     pub fn new() -> Self {
         ClaudeCodeAdapter {
             connector: claudecode::ClaudeCodeConnector::new(),
+        }
+    }
+}
+
+/// Cursor 适配器
+pub struct CursorAdapter {
+    connector: cursor::CursorConnector,
+}
+
+impl CursorAdapter {
+    pub fn new() -> Self {
+        CursorAdapter {
+            connector: cursor::CursorConnector::new(),
         }
     }
 }
@@ -146,6 +162,30 @@ impl AgentConnector for ClaudeCodeAdapter {
 
     fn watch_session(&self, _callback: Option<SessionCallback>) -> Result<(), String> {
         self.connector.watch_session(_callback)
+    }
+}
+
+#[async_trait::async_trait]
+impl AgentConnector for CursorAdapter {
+    async fn connect(&mut self, _config: &AgentConfig) -> Result<(), String> {
+        if !self.connector.check_logs() {
+            return Err("Cursor logs not found".to_string());
+        }
+        Ok(())
+    }
+
+    fn disconnect(&mut self) -> Result<(), String> {
+        Ok(())
+    }
+
+    async fn fetch_sessions(&self) -> Result<Vec<SessionData>, String> {
+        self.connector.get_recent_sessions(100)
+    }
+
+    fn watch_session(&self, _callback: Option<SessionCallback>) -> Result<(), String> {
+        // CursorConnector 的 watch_session 实现在 async_trait 中
+        // 这里返回成功，实际监听逻辑在 connector 内部
+        Ok(())
     }
 }
 

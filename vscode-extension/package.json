@@ -1,0 +1,186 @@
+{
+  "name": "mindcortex-vscode",
+  "displayName": "MindCortex - 知识管理助手",
+  "description": "在 VSCode 中使用 MindCortex 智能知识库，支持语义搜索、代码助手和知识图谱",
+  "version": "0.1.0",
+  "publisher": "mindcortex",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Other",
+    "Snippets"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "mindcortex.openMainPanel",
+        "title": "打开 MindCortex 面板",
+        "category": "MindCortex"
+      },
+      {
+        "command": "mindcortex.search",
+        "title": "搜索知识库",
+        "category": "MindCortex",
+        "icon": "$(search)"
+      },
+      {
+        "command": "mindcortex.searchSelected",
+        "title": "搜索选中文本",
+        "category": "MindCortex"
+      },
+      {
+        "command": "mindcortex.openCodeAssistant",
+        "title": "打开代码助手",
+        "category": "MindCortex",
+        "icon": "$(lightbulb)"
+      },
+      {
+        "command": "mindcortex.openKnowledgeGraph",
+        "title": "打开知识图谱",
+        "category": "MindCortex",
+        "icon": "$(graph)"
+      },
+      {
+        "command": "mindcortex.addSnippet",
+        "title": "添加代码片段",
+        "category": "MindCortex"
+      },
+      {
+        "command": "mindcortex.manageSessions",
+        "title": "管理会话",
+        "category": "MindCortex"
+      },
+      {
+        "command": "mindcortex.refreshIndex",
+        "title": "刷新索引",
+        "category": "MindCortex"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "mindcortex.search",
+        "key": "cmd+shift+m",
+        "mac": "cmd+shift+m",
+        "win": "ctrl+shift+m",
+        "linux": "ctrl+shift+m"
+      },
+      {
+        "command": "mindcortex.searchSelected",
+        "key": "cmd+shift+alt+m",
+        "mac": "cmd+shift+alt+m",
+        "win": "ctrl+shift+alt+m",
+        "linux": "ctrl+shift+alt+m"
+      }
+    ],
+    "contextMenus": [
+      {
+        "when": "editorHasSelection",
+        "menu": "editor/context",
+        "command": "mindcortex.searchSelected",
+        "group": "search"
+      }
+    ],
+    "statusBar": [
+      {
+        "id": "mindcortex.status",
+        "name": "MindCortex 状态",
+        "alignment": "left",
+        "text": "$(book) MindCortex",
+        "command": "mindcortex.openMainPanel",
+        "priority": 100
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "mindcortex-container",
+          "title": "MindCortex",
+          "icon": "resources/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "mindcortex-container": [
+        {
+          "id": "mindcortex.searchView",
+          "name": "搜索",
+          "type": "webview"
+        },
+        {
+          "id": "mindcortex.assistantView",
+          "name": "代码助手",
+          "type": "webview"
+        },
+        {
+          "id": "mindcortex.graphView",
+          "name": "知识图谱",
+          "type": "webview"
+        },
+        {
+          "id": "mindcortex.sessionsView",
+          "name": "会话管理",
+          "type": "tree"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "MindCortex",
+      "properties": {
+        "mindcortex.apiEndpoint": {
+          "type": "string",
+          "default": "http://localhost:3000",
+          "description": "MindCortex API 端点"
+        },
+        "mindcortex.autoIndex": {
+          "type": "boolean",
+          "default": true,
+          "description": "自动索引代码文件"
+        },
+        "mindcortex.indexInterval": {
+          "type": "number",
+          "default": 300000,
+          "description": "自动索引间隔（毫秒）"
+        },
+        "mindcortex.enableCodeAssistant": {
+          "type": "boolean",
+          "default": true,
+          "description": "启用代码助手"
+        },
+        "mindcortex.maxSearchResults": {
+          "type": "number",
+          "default": 20,
+          "description": "最大搜索结果数"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/runTest.js"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.80.0",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0",
+    "eslint": "^8.0.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0"
+  },
+  "dependencies": {
+    "axios": "^1.6.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mindcortex/MindCortex"
+  },
+  "license": "MIT"
+}

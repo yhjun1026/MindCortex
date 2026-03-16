@@ -1,5 +1,5 @@
-// OpenCode Agent Connector
-// 解析 OpenCode 的日志文件和会话数据
+// Cursor Agent Connector
+// 解析 Cursor 的日志文件和会话数据
 
 use super::{AgentConnector, AgentConfig, SessionData, Message, Attachment};
 use std::path::{Path, PathBuf};
@@ -7,35 +7,35 @@ use chrono::{DateTime, Utc, TimeZone};
 use serde::{Serialize, Deserialize};
 use serde_json::Value;
 
-/// OpenCode 日志格式
-#[derive(Debug, Clone)]
-pub struct OpenCodeLog {
+/// Cursor 日志格式
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CursorLog {
     pub timestamp: i64,
     pub role: String,
     pub content: String,
-    pub metadata: OpenCodeMetadata,
+    pub metadata: CursorMetadata,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct OpenCodeMetadata {
+pub struct CursorMetadata {
     pub session_id: Option<String>,
     pub model: Option<String>,
     pub tokens: Option<i64>,
     pub file_path: Option<String>,
 }
 
-pub struct OpenCodeConnector {
+pub struct CursorConnector {
     log_path: PathBuf,
     connected: bool,
 }
 
-impl OpenCodeConnector {
+impl CursorConnector {
     pub fn new() -> Self {
-        let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
+        let home = std::env::var("HOME").unwrap_or_else(|_| "~".to_string());
         let log_path = PathBuf::from(home)
-            .join(".opencode")
+            .join(".cursor")
             .join("logs")
-            .join("sessions.log");
+            .join("conversations.log");
 
         Self {
             log_path,
@@ -58,7 +58,7 @@ impl OpenCodeConnector {
         }
 
         let content = std::fs::read_to_string(&self.log_path)
-            .map_err(|e| format!("Failed to read OpenCode logs: {}", e))?;
+            .map_err(|e| format!("Failed to read Cursor logs: {}", e))?;
 
         let sessions = self.parse_log_content(&content)?;
         Ok(sessions)
@@ -78,13 +78,13 @@ impl OpenCodeConnector {
                     if let Some(sid) = &current_session_id {
                         sessions.push(self.create_session_data(
                             sid,
-                            &current_messages,
+                            current_messages.clone(),
                             session_start,
                         ));
                     }
                 }
 
-                current_session_id = Some(self.extract_session_id_id(line));
+                current_session_id = Some(self.extract_session_id(line));
                 current_messages.clear();
                 session_start = Utc::now().timestamp();
             }
@@ -99,7 +99,7 @@ impl OpenCodeConnector {
             if let Some(sid) = &current_session_id {
                 sessions.push(self.create_session_data(
                     sid,
-                    &current_messages,
+                    current_messages,
                     session_start,
                 ));
             }
@@ -108,7 +108,7 @@ impl OpenCodeConnector {
         Ok(sessions)
     }
 
-    fn extract_session_id_id(&self, line: &str) -> String {
+    fn extract_session_id(&self, line: &str) -> String {
         if let Some(pos) = line.find("Session:") {
             let id_part = line[pos + "Session:".len()..].trim();
             if !id_part.is_empty() {
@@ -140,10 +140,10 @@ impl OpenCodeConnector {
         }
     }
 
-    fn create_session_data(&self, id: &str, messages: &Vec<Message>, timestamp: i64) -> SessionData {
+    fn create_session_data(&self, id: &str, messages: Vec<Message>, timestamp: i64) -> SessionData {
         SessionData {
             id: id.to_string(),
-            agent_type: "opencode".to_string(),
+            agent_type: "cursor".to_string(),
             timestamp,
             messages: messages.clone(),
             metadata: serde_json::json!({
@@ -159,21 +159,16 @@ impl OpenCodeConnector {
         sessions.truncate(limit);
         Ok(sessions)
     }
-
-    pub fn watch_logs(&self) -> Result<(), String> {
-        println!("Watching OpenCode logs at: {:?}", self.log_path);
-        Ok(())
-    }
 }
 
 #[async_trait::async_trait]
-impl AgentConnector for OpenCodeConnector {
+impl AgentConnector for CursorConnector {
     async fn connect(&mut self, _config: &AgentConfig) -> Result<(), String> {
         if self.check_logs() {
             self.connected = true;
             Ok(())
         } else {
-            Err("OpenCode logs not found".to_string())
+            Err("Cursor logs not found".to_string())
         }
     }
 
@@ -187,6 +182,7 @@ impl AgentConnector for OpenCodeConnector {
     }
 
     fn watch_session(&self, _callback: Option<super::SessionCallback>) -> Result<(), String> {
-        self.watch_logs()
+        println!("Watching Cursor logs at: {:?}", self.log_path);
+        Ok(())
     }
 }

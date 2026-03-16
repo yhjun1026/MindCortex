@@ -29,3 +29,4 @@ directories = "5"
 notify = "6"
 reqwest = { version = "0.12", features = ["json"] }
 async-trait = "0.1"
+regex = "1"
