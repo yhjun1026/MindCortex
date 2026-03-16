@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { SearchBar } from './SearchBar';
-import { SearchResults } from './SearchResults';
+import { SearchBar } from '../components/SearchBar';
+import { SearchResultsEnhanced } from '../components/SearchResultsEnhanced';
 
 interface SearchResult {
   id: string;
@@ -81,17 +81,6 @@ export const AdvancedSearchPage: React.FC = () => {
     setSearchConfig(prev => ({ ...prev, searchType: type }));
   };
 
-  const handleFilterChange = (newFilters: Partial<SearchFilters>) => {
-    setSearchConfig(prev => ({ 
-      ...prev, 
-      filters: { ...prev.filters, ...newFilters } 
-    }));
-  };
-
-  const clearFilters = () => {
-    setSearchConfig(prev => ({ ...prev, filters: {} }));
-  };
-
   const handleResultSelect = (result: SearchResult) => {
     setSelectedResult(result);
   };
@@ -100,58 +89,31 @@ export const AdvancedSearchPage: React.FC = () => {
     const data = JSON.stringify(results, null, 2);
     const blob = new Blob([data], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
-    
+
     const link = document.createElement('a');
     link.href = url;
     link.download = `search-results-${Date.now()}.json`;
     link.click();
-    
+
     URL.revokeObjectURL(url);
   };
 
   const exportResultsCSV = () => {
     const headers = 'ID,Content,Score,Source,Timestamp\n';
-    const rows = results.map(r => 
+    const rows = results.map(r =>
       `"${r.id}","${r.content.replace(/"/g, '""')}","${r.score.toFixed(4)}","${r.metadata.source}","${r.metadata.timestamp}"`
     ).join('\n');
-    
+
     const csv = headers + rows;
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
-    
+
     const link = document.createElement('a');
     link.href = url;
     link.download = `search-results-${Date.now()}.csv`;
     link.click();
-    
+
     URL.revokeObjectURL(url);
-  };
-
-  const formatScore = (score: number) => {
-    return (score * 100).toFixed(1);
-  };
-
-  const formatTimestamp = (timestamp: number) => {
-    const date = new Date(timestamp * 1000);
-    return date.toLocaleString('zh-CN', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
-
-  const getSourceIcon = (source: string) => {
-    const icons: Record<string, string> = {
-      opencode: '💻',
-      claudecode: '🤖',
-      cursor: '🎯',
-      file: '📄',
-      memory: '🧠',
-      unknown: '📝',
-    };
-    return icons[source] || icons.unknown;
   };
 
   return (
@@ -251,7 +213,7 @@ export const AdvancedSearchPage: React.FC = () => {
             </div>
           </div>
 
-          <SearchResults
+          <SearchResultsEnhanced
             results={results}
             onSelect={handleResultSelect}
           />
@@ -288,19 +250,6 @@ export const AdvancedSearchPage: React.FC = () => {
               <label>ID:</label>
               <span>{selectedResult.id}</span>
             </div>
-            <div className="detail-field">
-              <label>来源:</label>
-              <span>
-                {getSourceIcon(selectedResult.metadata.source)}
-                <span className="detail-source-label">
-                  {selectedResult.metadata.source}
-                </span>
-              </span>
-            </div>
-            <div className="detail-field">
-              <label>时间戳:</label>
-              <span>{formatTimestamp(selectedResult.metadata.timestamp)}</span>
-            </div>
             {selectedResult.metadata.session_id && (
               <div className="detail-field">
                 <label>会话 ID:</label>
@@ -333,7 +282,7 @@ export const AdvancedSearchPage: React.FC = () => {
         </div>
       )}
 
-      <style jsx>{`
+      <style>{`
         .advanced-search-page {
           min-height: 100vh;
           padding: 40px 20px;
@@ -464,6 +413,7 @@ export const AdvancedSearchPage: React.FC = () => {
           display: flex;
           justify-content: space-between;
           align-items: center;
+;
           margin-bottom: 16px;
         }
 

@@ -1,9 +1,9 @@
 // 关键词索引
 // 使用 SQLite 实现关键词搜索索引
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
-use rusqlite::{Connection, params};
+use rusqlite::{Connection, params, Row};
 use serde::{Deserialize, Serialize};
 
 /// 索引对象
@@ -34,9 +34,10 @@ impl KeywordIndex {
                 .map_err(|e| format!("Failed to create database directory: {}", e))?;
         }
 
+        let conn = Arc::new(Mutex::new(None));
         let index = Self {
             db_path: db_path.clone(),
-            conn: Arc::new(Mutex::new(None)),
+            conn,
         };
 
         // 初始化数据库
@@ -48,6 +49,14 @@ impl KeywordIndex {
     /// 初始化数据库
     fn initialize(&self) -> Result<(), String> {
         let mut conn_opt = self.conn.lock().unwrap();
+
+        // 如果连接不存在，创建新连接
+        if conn_opt.is_none() {
+            let conn = Connection::open(&self.db_path)
+                .map_err(|e| format!("Failed to open database: {}", e))?;
+            *conn_opt = Some(conn);
+        }
+
         let conn = conn_opt.as_mut().ok_or("Connection not initialized")?;
 
         conn.execute(
@@ -62,12 +71,12 @@ impl KeywordIndex {
                 updated_at INTEGER
             );",
             [],
-        )?;
+        ).map_err(|e| format!("Failed to create documents table: {}", e))?;
 
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_file_path ON documents(file_path);",
             [],
-        )?;
+        ).map_err(|e| format!("Failed to create index: {}", e))?;
 
         Ok(())
     }
@@ -83,7 +92,7 @@ impl KeywordIndex {
         conn.execute(
         "INSERT INTO documents (id, content, file_path, content_length, language, tags, created_at, updated_at)
             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8);",
-            (
+            params![
                 &document.id,
                 &document.content,
                 &document.file_path,
@@ -92,7 +101,7 @@ impl KeywordIndex {
                 &tags_json,
                 document.created_at,
                 document.updated_at,
-            ),
+            ],
         ).map_err(|e| format!("Failed to insert document: {}", e))?;
 
         Ok(())
@@ -113,7 +122,7 @@ impl KeywordIndex {
             tx.execute(
                 "INSERT INTO documents (id, content, file_path, content_length, language, tags, created_at, updated_at)
                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8);",
-                (
+                params![
                     &doc.id,
                     &doc.content,
                     &doc.file_path,
@@ -122,13 +131,30 @@ impl KeywordIndex {
                     &tags_json,
                     doc.created_at,
                     doc.updated_at,
-                ),
+                ],
             ).map_err(|e| format!("Failed to insert: {}", e))?;
         }
 
         tx.commit().map_err(|e| format!("Failed to commit: {}", e))?;
 
         Ok(())
+    }
+
+    /// 从Row构建IndexedDocument
+    fn document_from_row(row: &Row) -> IndexedDocument {
+        let tags_str: String = row.get("tags").unwrap_or_default();
+        let tags: Vec<String> = serde_json::from_str(&tags_str).unwrap_or_default();
+
+        IndexedDocument {
+            id: row.get("id").unwrap_or_default(),
+            content: row.get("content").unwrap_or_default(),
+            file_path: row.get("file_path").unwrap_or_default(),
+            content_length: row.get("content_length").unwrap_or(0) as usize,
+            language: row.get("language").unwrap_or_default(),
+            tags,
+            created_at: row.get("created_at").unwrap_or(0),
+            updated_at: row.get("updated_at").unwrap_or(0),
+        }
     }
 
     /// 搜索文档
@@ -145,23 +171,11 @@ impl KeywordIndex {
         ).map_err(|e| format!("Failed to prepare: {}", e))?;
 
         let mut results = Vec::new();
-        let mut rows = stmt.query((query, max_results as i64))
+        let mut rows = stmt.query(params![query, max_results as i64])
             .map_err(|e| format!("Failed to query: {}", e))?;
 
-        while let Some(row) = rows.next() {
-            let row = row.map_err(|e| format!("Failed to get row: {}", e))?;
-            let tags_str: String = row.get("tags").unwrap_or_default();
-            let tags: Vec<String> = serde_json::from_str(&tags_str).unwrap_or_default();
-            results.push(IndexedDocument {
-                id: row.get("id").unwrap_or_default(),
-                content: row.get("content").unwrap_or_default(),
-                file_path: row.get("file_path").unwrap_or_default(),
-                content_length: row.get::<i64>("content_length").unwrap_or(0) as usize,
-                language: row.get("language").unwrap_or_default(),
-                tags,
-                created_at: row.get::<i64>("created_at").unwrap_or(0),
-                updated_at: row.get::<i64>("updated_at").unwrap_or(0),
-            });
+        while let Ok(Some(row)) = rows.next() {
+            results.push(Self::document_from_row(row));
         }
 
         Ok(results)
@@ -184,27 +198,12 @@ impl KeywordIndex {
              LIMIT ?2;"
         ).map_err(|e| format!("Failed to prepare: {}", e))?;
 
-        let mut rows = stmt.query((_query, _max_results as i64))
+        let mut rows = stmt.query(params![_query, _max_results as i64])
             .map_err(|e| format!("Failed to query: {}", e))?;
 
-        while let Some(row) = rows.next() {
-            let row = row.map_err(|e| format!("Failed to get row: {}", e))?;
-            let tags_str: String = row.get("tags").unwrap_or_default();
-            let tags: Vec<String> = serde_json::from_str(&tags_str).unwrap_or_default();
+        while let Ok(Some(row)) = rows.next() {
             let score = 0.5;
-            results.push((
-                IndexedDocument {
-                    id: row.get("id").unwrap_or_default(),
-                    content: row.get("content").unwrap_or_default(),
-                    file_path: row.get("file_path").unwrap_or_default(),
-                    content_length: row.get::<i64>("content_length").unwrap_or(0) as usize,
-                    language: row.get("language").unwrap_or_default(),
-                    tags,
-                    created_at: row.get::<i64>("created_at").unwrap_or(0),
-                    updated_at: row.get::<i64>("updated_at").unwrap_or(0),
-                },
-                score
-            ));
+            results.push((Self::document_from_row(row), score));
         }
 
         Ok(results)
@@ -226,23 +225,11 @@ impl KeywordIndex {
         ).map_err(|e| format!("Failed to prepare: {}", e))?;
 
         let mut results = Vec::new();
-        let mut rows = stmt.query((file_path, max_results as i64))
+        let mut rows = stmt.query(params![file_path, max_results as i64])
             .map_err(|e| format!("Failed to query: {}", e))?;
 
-        while let Some(row) = rows.next() {
-            let row = row.map_err(|e| format!("Failed to get row: {}", e))?;
-            let tags_str: String = row.get("tags").unwrap_or_default();
-            let tags: Vec<String> = serde_json::from_str(&tags_str).unwrap_or_default();
-            results.push(IndexedDocument {
-                id: row.get("id").unwrap_or_default(),
-                content: row.get("content").unwrap_or_default(),
-                file_path: row.get("file_path").unwrap_or_default(),
-                content_length: row.get::<i64>("content_length").unwrap_or(0) as usize,
-                language: row.get("language").unwrap_or_default(),
-                tags,
-                created_at: row.get::<i64>("created_at").unwrap_or(0),
-                updated_at: row.get::<i64>("updated_at").unwrap_or(0),
-            });
+        while let Ok(Some(row)) = rows.next() {
+            results.push(Self::document_from_row(row));
         }
 
         Ok(results)
@@ -264,23 +251,11 @@ impl KeywordIndex {
         ).map_err(|e| format!("Failed to prepare: {}", e))?;
 
         let mut results = Vec::new();
-        let mut rows = stmt.query((tag, max_results as i64))
+        let mut rows = stmt.query(params![tag, max_results as i64])
             .map_err(|e| format!("Failed to query: {}", e))?;
 
-        while let Some(row) = rows.next() {
-            let row = row.map_err(|e| format!("Failed to get row: {}", e))?;
-            let tags_str: String = row.get("tags").unwrap_or_default();
-            let tags: Vec<String> = serde_json::from_str(&tags_str).unwrap_or_default();
-            results.push(IndexedDocument {
-                id: row.get("id").unwrap_or_default(),
-                content: row.get("content").unwrap_or_default(),
-                file_path: row.get("file_path").unwrap_or_default(),
-                content_length: row.get::<i64>("content_length").unwrap_or(0) as usize,
-                language: row.get("language").unwrap_or_default(),
-                tags,
-                created_at: row.get::<i64>("created_at").unwrap_or(0),
-                updated_at: row.get::<i64>("updated_at").unwrap_or(0),
-            });
+        while let Ok(Some(row)) = rows.next() {
+            results.push(Self::document_from_row(row));
         }
 
         Ok(results)
@@ -291,19 +266,19 @@ impl KeywordIndex {
         let mut conn_opt = self.conn.lock().unwrap();
         let conn = conn_opt.as_mut().ok_or("Connection not initialized")?;
 
-        conn.execute("DELETE FROM documents WHERE id = ?1;", [id])
+        conn.execute("DELETE FROM documents WHERE id = ?1;", params![id])
             .map_err(|e| format!("Failed to delete: {}", e))?;
 
         Ok(())
     }
 
     /// 清空索引
-    pub fn clear(&self) -> Result<(), String> {
+    pub fn clear(&self) -> Result<(), ()> {
         let mut conn_opt = self.conn.lock().unwrap();
-        let conn = conn_opt.as_mut().ok_or("Connection not initialized")?;
+        let conn = conn_opt.as_mut().ok_or(())?;
 
         conn.execute("DELETE FROM documents;", [])
-            .map_err(|e| format!("Failed to clear: {}", e))?;
+            .map_err(|_| ())?;
 
         Ok(())
     }
@@ -319,27 +294,12 @@ impl KeywordIndex {
         let mut rows = stmt.query([])
             .map_err(|e| format!("Failed to query: {}", e))?;
 
-        while let Some(row) = rows.next() {
-            let row = row.map_err(|e| format!("Failed to get row: {}", e))?;
+        while let Ok(Some(row)) = rows.next() {
             let count: i64 = row.get("count").unwrap_or(0);
             return Ok(count as usize);
         }
 
         Ok(0)
-    }
-
-    /// 获取连接
-    fn get_connection(&self) -> Result<Arc<Mutex<Option<Connection>>>, String> {
-        let mut conn_opt = self.conn.lock().unwrap();
-
-        if conn_opt.is_none() {
-            let new_conn = Connection::open(&self.db_path)
-                .map_err(|e| format!("Failed to open database: {}", e))?;
-
-            *conn_opt = Some(new_conn);
-        }
-
-        Ok(self.conn.clone())
     }
 }
 

@@ -146,8 +146,8 @@ impl QueryOptimizer {
         // 简单的关键词提取（基于空格和标点）
         let words: Vec<String> = query
             .split(|c: char| c.is_whitespace() || c.is_ascii_punctuation())
-            .filter(|w: &str| w.len() > 1)
-            .map(|s| s.to_string())
+            .filter(|w: &&str| w.len() > 1)
+            .map(|s: &str| s.to_string())
             .collect();
 
         for word in words {
@@ -184,8 +184,8 @@ impl QueryOptimizer {
         // 识别标签（以 # 开头的词）
         let words: Vec<String> = query
             .split(|c: char| c.is_whitespace() || c.is_ascii_punctuation())
-            .filter(|w: &str| w.starts_with('#'))
-            .map(|s| s.to_string())
+            .filter(|w: &&str| w.starts_with('#'))
+            .map(|s: &str| s.to_string())
             .collect();
 
         for tag in words {
@@ -217,8 +217,8 @@ impl QueryOptimizer {
         // 包含多个非技术词的查询可能是语义查询
         let words: Vec<String> = query
             .split(|c: char| c.is_whitespace())
-            .filter(|w: &str| w.len() > 2)
-            .map(|s| s.to_string())
+            .filter(|w: &&str| w.len() > 2)
+            .map(|s: &str| s.to_string())
             .collect();
 
         words.len() >= 2

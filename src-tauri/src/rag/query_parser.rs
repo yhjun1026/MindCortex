@@ -79,7 +79,7 @@ impl QueryParser {
         let entities = self.extract_entities(query);
         let keywords = self.extract_keywords(query);
         let filters = self.extract_filters(query);
-        let confidence = self.calculate_confidence(query, &intent);
+        let confidence = self.calculate_conf(query, &intent);
 
         let parsed = ParsedQuery {
             original: query.to_string(),

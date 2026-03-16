@@ -1,7 +1,7 @@
 // 搜索结果组件
 // 带有搜索结果分组、筛选和显示功能
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 
 interface SearchResult {
   id: string;
@@ -28,29 +28,22 @@ interface SearchFilters {
   score_max?: number;
 }
 
-interface SearchStats {
-  total: number;
-  source_counts: Record<string, number>;
-  type_counts: Record<string, number>;
-  average_score: number;
-}
-
-export const SearchResults: React.FC<{
+export const SearchResultsEnhanced: React.FC<{
   results: SearchResult[];
   onSelect?: (result: SearchResult) => void;
   maxResults?: number;
   filters?: SearchFilters;
   showStats?: boolean;
-}> = ({ 
-  results, 
-  onSelect, 
+}> = ({
+  results,
+  onSelect,
   maxResults,
-  filters: defaultFilters,
+  filters,
   showStats = true,
 }) => {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
-  const [groupBy, setGroupBy] = useState<'source' | 'none' | 'time'>('none');
-  const [sortBy, setSortBy] = useState<'score' | 'time'>('score');
+  const [groupBy, _setGroupBy] = useState<'source' | 'none' | 'time'>('none');
+  const [sortBy, _setSortBy] = useState<'score' | 'time'>('score');
 
   // 应用过滤
   const filteredResults = results.filter(result => {
@@ -84,12 +77,12 @@ export const SearchResults: React.FC<{
     if (groupBy === 'none') {
       return { 'all': filteredResults };
     }
-    
+
     const groups: Record<string, SearchResult[]> = {};
-    
+
     for (const result of filteredResults) {
-      const key = groupBy === 'source' ? result.metadata.source : 
-                 groupBy === 'time' ? 
+      const key = groupBy === 'source' ? result.metadata.source :
+                 groupBy === 'time' ?
                    new Date(result.metadata.timestamp * 1000).toLocaleDateString('zh-CN', {
                      year: 'numeric',
                      month: 'short',
@@ -97,21 +90,19 @@ export const SearchResults: React.FC<{
                      hour: '2-digit',
                      minute: '2-digit'
                    }) : 'unknown';
-      
+
       if (!groups[key]) {
         groups[key] = [];
       }
       groups[key].push(result);
     }
-    
+
     return groups;
   }, [filteredResults, groupBy]);
 
   // 排序结果
   const sortedResults = React.useMemo(() => {
-    if (sortBy === 'none') return filteredResults;
-    
-    return filteredResults.sort((a, b) => {
+    return [...filteredResults].sort((a, b) => {
       if (sortBy === 'score') {
         return b.score - a.score;
       } else if (sortBy === 'time') {
@@ -171,22 +162,22 @@ export const SearchResults: React.FC<{
 
     filteredResults.forEach(result => {
       const source = result.metadata.source;
-      source_counts[source] = (source_counts[source] || 0) + 1;
-      
+      sourceCounts[source] = (sourceCounts[source] || 0) + 1;
+
       const type = 'result'; // 可以根据需要改为其他类型
       typeCounts[type] = (typeCounts[type] || 0) + 1;
       totalScore += result.score;
     });
 
-    const averageScore = filteredResults.length > 0 
-      ? totalScore / filteredResults.length 
+    const averageScore = filteredResults.length > 0
+      ? totalScore / filteredResults.length
       : 0;
 
     return {
       total: filteredResults.length,
-      source_counts,
-      type_counts,
-      average_score,
+      sourceCounts,
+      typeCounts,
+      averageScore,
     };
   }, [filteredResults]);
 
@@ -201,12 +192,12 @@ export const SearchResults: React.FC<{
           </div>
           <div className="stats-item">
             <span className="stats-label">平均分数:</span>
-            <span className="stats-value">{formatScore(stats.average_score)}%</span>
+            <span className="stats-value">{formatScore(stats.averageScore)}%</span>
           </div>
           <div className="stats-item">
             <span className="stats-label">来源分布:</span>
             <span className="stats-value">
-              {Object.entries(stats.source_counts).map(([source, count]) => (
+              {Object.entries(stats.sourceCounts).map(([source, count]) => (
                 <span key={source}>
                   {getSourceIcon(source)} {source}: {count}
                 </span>
