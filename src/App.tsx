@@ -2,6 +2,10 @@ import { useState, useEffect } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import './App.css'
 import { SearchPage } from './pages/SearchPage'
+import { KnowledgePage } from './pages/KnowledgePage'
+import { AgentsPage } from './pages/AgentsPage'
+import { FilesPage } from './pages/FilesPage'
+import { TasksPage } from './pages/TasksPage'
 
 interface Project {
   id: string
@@ -113,6 +117,18 @@ function App() {
             🔌 Agents
           </button>
           <button
+            className={`nav-item ${activeTab === 'files' ? 'active' : ''}`}
+            onClick={() => setActiveTab('files')}
+          >
+            📁 Files
+          </button>
+          <button
+            className={`nav-item ${activeTab === 'tasks' ? 'active' : ''}`}
+            onClick={() => setActiveTab('tasks')}
+          >
+            ✅ Tasks
+          </button>
+          <button
             className={`nav-item ${activeTab === 'settings' ? 'active' : ''}`}
             onClick={() => setActiveTab('settings')}
           >
@@ -211,33 +227,15 @@ function App() {
               </div>
             )}
 
-            {activeTab === 'knowledge' && (
-              <div className="page">
-                <header>
-                  <h1>🧠 Knowledge Base</h1>
-                  <p>Your accumulated AI experience</p>
-                </header>
-                <div className="empty-state">
-                  <p>Knowledge features coming soon!</p>
-                  <p>This will allow you to browse, search, and manage all knowledge extracted from your AI sessions.</p>
-                </div>
-              </div>
-            )}
+            {activeTab === 'knowledge' && <KnowledgePage />}
 
             {activeTab === 'search' && <SearchPage />}
 
-            {activeTab === 'agents' && (
-              <div className="page">
-                <header>
-                  <h1>🔌 Agent Connections</h1>
-                  <p>Connect your AI tools to CortexMind</p>
-                </header>
-                <div className="empty-state">
-                  <p>Agent connections coming soon!</p>
-                  <p>Supported: OpenCode, ClaudeCode, OpenClaw, Cursor, and more.</p>
-                </div>
-              </div>
-            )}
+            {activeTab === 'agents' && <AgentsPage />}
+
+            {activeTab === 'files' && <FilesPage />}
+
+            {activeTab === 'tasks' && <TasksPage />}
 
             {activeTab === 'settings' && (
               <div className="page">
